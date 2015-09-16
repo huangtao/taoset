@@ -1,0 +1,66 @@
+# huangtao's git ignore config file
+
+# Mac os x
+.DS_Store
+
+#  thumbnails created by windows
+Thumbs.db
+
+# vim swaps
+*.swp
+*.swo
+
+# normal
+.git
+build/
+bin/
+*.log
+*.pyc
+
+# object files
+*.[oa]
+*.obj
+
+# xcode
+*.pbxuser
+*.xcscheme
+*.xcuserstate
+*.xccheckout
+xcuserdata/
+DerivedData/
+
+# ndk and android studio
+.idea/
+.gradle/
+*.iml
+*.apk
+*.ap_
+*.dex
+*.class
+libs/
+proguard/
+gradle/
+gen/
+local.properties
+
+# Visual Studio
+*.obj
+*.exe
+*.pdb
+*.aps
+*.vcproj.*.user
+*.ncb
+*.suo
+*.bak
+*.ilk
+[Bb]in
+[Dd]ebug/
+[Dd]ebug.win32/
+*.sbr
+*.sdf
+[Rr]elease/
+[Rr]elease.win32/
+
+# CTags
+tags
+
