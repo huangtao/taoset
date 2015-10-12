@@ -16,6 +16,9 @@ syntax on
 set autoindent
 set cindent
 
+" TAB展开为空格
+set expandtab
+
 " 自动缩进的空白长度
 set shiftwidth=4
 
