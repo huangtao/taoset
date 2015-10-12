@@ -25,3 +25,6 @@ set softtabstop=4
 
 " 显示行号
 set nu
+
+" 修改注释颜色
+highlight Comment ctermfg=DarkCyan guifg=DrakCyan
