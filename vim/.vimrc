@@ -16,18 +16,13 @@ syntax on
 set autoindent
 set cindent
 
-" TAB展开为空格
-set expandtab
-
 " 自动缩进的空白长度
 set shiftwidth=4
 
 " 制表符(4个空格)
-set tabstop=4
+"set tabstop=4
 set softtabstop=4
+set expandtab
 
 " 显示行号
 set nu
-
-" 修改注释颜色
-highlight Comment ctermfg=DarkCyan guifg=DrakCyan
