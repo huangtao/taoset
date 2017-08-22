@@ -117,7 +117,12 @@ npm install express -g
 # 启动服务器
 # pm2 start app.js
 # pm2 start app.js --name 'myname'
+
+# 指定端口启动express
+# PORT=80 pm2 start ./bin/www --name www
+
 # 将应用列表保存用于pm2启动时自动启动
 # pm2 save
+
 # 开机自动启动(放最后)
 # pm2 startup
