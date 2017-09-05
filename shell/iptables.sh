@@ -43,8 +43,9 @@ iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 # Gate服务器
 iptables -A INPUT -p tcp --dport 8600 -j ACCEPT
 iptables -A INPUT -p tcp --dport 8601 -j ACCEPT
-# 代理服务器
 iptables -A INPUT -p tcp --dport 8602 -j ACCEPT
+# 代理服务器
+iptables -A INPUT -p tcp --dport 8603 -j ACCEPT
 # 游戏服务器
 iptables -A INPUT -p tcp --dport 8610 -j ACCEPT
 # h5服务器
