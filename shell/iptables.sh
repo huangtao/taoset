@@ -15,10 +15,14 @@ echo "seting firewall..."
 iptables -F
 iptables -X
 iptables -Z
+
 # 配置默认策略(能出不能进)
 iptables -P INPUT DROP
 iptables -P FORWARD DROP
 iptables -P OUTPUT ACCEPT
+# 外部主机的应答数据包
+# 否则服务器还是不能访问外网(因为数据进不来)
+iptables -I INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
 
 # ssh
 iptables -A INPUT -p tcp --dport 22 -j ACCEPT
