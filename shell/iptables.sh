@@ -23,6 +23,12 @@ iptables -P OUTPUT ACCEPT
 # 外部主机的应答数据包
 # 否则服务器还是不能访问外网(因为数据进不来)
 iptables -I INPUT -p tcp -m state --state ESTABLISHED -j ACCEPT
+# dns(服务器有http请求需要解析dsn时需要打开)
+iptables -A INPUT -p udp --sport 53 -j ACCEPT
+
+####################################################################
+# 开放端口
+#
 
 # ssh
 iptables -A INPUT -p tcp --dport 22 -j ACCEPT
@@ -33,9 +39,6 @@ iptables -A INPUT -p tcp --dport 443 -j ACCEPT
 # ftp 20,21
 #iptables -A INPUT -p tcp --dport 20 -j ACCEPT
 #iptables -A INPUT -p tcp --dport 21 -j ACCEPT
-
-# dns(服务器有http请求需要解析dsn时需要打开)
-iptables -A INPUT -p udp --sport 53 -j ACCEPT
 
 # Gate服务器
 iptables -A INPUT -p tcp --dport 8600 -j ACCEPT
