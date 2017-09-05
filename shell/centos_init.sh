@@ -95,8 +95,10 @@ chkconfig postgresql-9.6 on
 # passwd postgres 
 
 # 配置postgresql远程访问(应用服务器访问数据库服务器时配置)
-# vi /var/lib/pgsql/9.6/data/postgresql.chkconf
+# vi /var/lib/pgsql/9.6/data/postgresql.conf
 # 将listen_addresses = 'localhost'改成listen_addresses = '*'并去掉注释
+
+# 配置用户访问权限
 # vi /var/lib/pgsql/9.6/data/pg_hba.conf
 # 允许所有IP地址访问(密码md5加密),测试可以生产环境不建议配置
 # host all all 0.0.0.0/0 md5
@@ -106,6 +108,8 @@ chkconfig postgresql-9.6 on
 # 注意:如果连接服务器返回ident authentication failed for user 'postgres'
 # 由于连接127.0.0.1使用的是ident认证方式,所以将连接地址改为公网IP即可
 
+# (切换到postgres用户)重新加载配置/usr/pgsql-9.6/bin
+# pg_ctl reload
 
 #############################################################################################
 # Node.js
