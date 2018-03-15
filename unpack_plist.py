@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-
+# -*- coding: UTF-8 -*-
 import os,sys
 import xml.etree.ElementTree as ET
 from PIL import Image
@@ -70,7 +70,8 @@ def get_png_from_plist(plist_filename, png_filename):
         # 建立新图片
         result_image = Image.new("RGBA", sizelist, (0,0,0,0))
         result_box = (0, 0, sizelist[0], sizelist[1])
-        result_image.paste(rect_on_big, result_box)
+        #print(str(k)+":"+str(src_rect)+","+str(result_box))
+        result_image.paste(rect_on_big, (0,0))
 
         # 保存到文件
         if not os.path.isdir(file_path):
