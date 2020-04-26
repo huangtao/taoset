@@ -5,6 +5,20 @@ yum install wget
 
 
 ###################################################################################################################
+# mysql
+wget https://dev.mysql.com/get/mysql57-community-release-el6-11.noarch.rpm
+sudo yum localinstall mysql57-community-release-el6-11.noarch.rpm
+sudo yum install mysql-community-server
+# 启动服务
+sudo service mysqld start
+# 开机启动
+sudo chkconfig mysqld on
+# 设置密码
+mysql_secure_installation
+# 注意MySQL为root用户随机生成了一个密码查看密码:
+grep 'temporary password' /var/log/mysqld.log
+
+###################################################################################################################
 # postgresql
 
 # 查看已安装的包
