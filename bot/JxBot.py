@@ -154,9 +154,8 @@ def main():
                         imgPop.save(os.path.join(tempDir, "JxBotSC_pop.png"))
                     imgPop_np = np.array(imgPop)
                     # 检查3个点符合分享图片取点
-                    px1 = imgPop_np[]
-
-                
+                    px1 = imgPop_np[374,480]
+               
                 # 一分钟后继续检测
                 time.sleep(60)
         else:
