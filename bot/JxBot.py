@@ -33,8 +33,16 @@ screenWidth, screenHeight = pyautogui.size()
 # 鼠标移动到屏幕中央
 pyautogui.moveTo(screenWidth / 2, screenHeight / 2)
 
+# 调试模式会输出中间处理的图片
+debug = True
+
 # 临时目录
 tempDir = "d:/temp/"
+
+# 识别模式
+# 0 - 判断黄色进度条是否达到100%
+# 1 - 识别数字是否是300
+mode = 0
 
 def resource_path(relative_path):
     if hasattr(sys, "_MEIPASS"):
@@ -99,28 +107,58 @@ def main():
 
                 # 对窗口截图
                 img = PIL.ImageGrab.grab(bbox=(left, top, right, bottom))
-                img.save(os.path.join(tempDir, "JxBotSC.jpg"))
+                if debug:
+                    img.save(os.path.join(tempDir, "JxBotSC.png"))
                 img_np = np.array(img)
 
                 # opencv处理
-                # 电力数字区域位于92,622 大小56,18
-                # img[0:rows, 0:cols]
-                roi = img_np[622:640,92:148]
-                # 将图片转化为灰色图片
-                img_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                cv2.imwrite(os.path.join(tempDir, "JxBotRoi_gray.jpg"), img_gray)
-                # 降噪处理
-                # 二值化处理
-                ret, img_inv = cv2.threshold(img_gray, 127, 255, cv2.THRESH_BINARY_INV)
-                cv2.imwrite(os.path.join(tempDir, "JxBotRoi_inv.jpg"), img_inv)
-                # 得到轮廓
-                im2, contours, hierarchy = cv2.findContours(img_inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                result = []
-                if (contours)
-                for contour in contours:
+                is_full = False
+                if mode == 0:
+                    # 进度条区域90,620 大小63,22
+                    roi = img_np[619:640,89:152]
+                    img_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
+                    if debug:
+                        cv2.imwrite(os.path.join(tempDir, "JxBotRoi.png"), img_roi)
+                    # 取62,11的像素RBG如果等于(255,177,0) 则已100%
+                    g, b, r = img_roi[11, 61]
+                    if (r ==
+                     255 and b == 177 and g == 0):
+                        # 鼠标点击进度条按钮中间
+                        pyautogui.moveTo(left + 120, top + 631)
+                        pyautogui.leftClick()
+                        is_full = True
+                else:
+                    # 电力数字区域位于92,622 大小56,18
+                    # img[0:rows, 0:cols]
+                    roi = img_np[622:640,92:148]
 
+                    # 将图片转化为灰色图片
+                    img_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+                    if debug:
+                        cv2.imwrite(os.path.join(tempDir, "JxBotRoi_gray.png"), img_gray)
+                    # 降噪处理
+                    # 二值化处理
+                    ret, img_inv = cv2.threshold(img_gray, 127, 255, cv2.THRESH_BINARY_INV)
+                    if debug:
+                        cv2.imwrite(os.path.join(tempDir, "JxBotRoi_inv.png"), img_inv)
+                    # 得到轮廓
+                    im2, contours, hierarchy = cv2.findContours(img_inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    result = []
+                    # if (contours)
+                    # for contour in contours:
 
-                time.sleep(200000)
+                if is_full:
+                    # 已点击，可能出现翻倍和观看广告，继续截屏判定
+                    imgPop = PIL.ImageGrab.grab(bbox=(left, top, right, bottom))
+                    if debug:
+                        imgPop.save(os.path.join(tempDir, "JxBotSC_pop.png"))
+                    imgPop_np = np.array(imgPop)
+                    # 检查3个点符合分享图片取点
+                    px1 = imgPop_np[]
+
+                
+                # 一分钟后继续检测
+                time.sleep(60)
         else:
             # print("Pause")
             systray.update(hover_text=app + " - 暂停")
