@@ -44,6 +44,7 @@ tempDir = "d:/temp/"
 # 1 - 识别数字是否是300
 mode = 0
 
+
 def resource_path(relative_path):
     if hasattr(sys, "_MEIPASS"):
         base_path = sys._MEIPASS
@@ -115,14 +116,15 @@ def main():
                 is_full = False
                 if mode == 0:
                     # 进度条区域90,620 大小63,22
-                    roi = img_np[619:640,89:152]
+                    roi = img_np[619:640, 89:152]
                     img_roi = cv2.cvtColor(roi, cv2.COLOR_BGR2RGB)
                     if debug:
-                        cv2.imwrite(os.path.join(tempDir, "JxBotRoi.png"), img_roi)
+                        cv2.imwrite(os.path.join(
+                            tempDir, "JxBotRoi.png"), img_roi)
                     # 取62,11的像素RBG如果等于(255,177,0) 则已100%
                     g, b, r = img_roi[11, 61]
                     if (r ==
-                     255 and b == 177 and g == 0):
+                            255 and b == 177 and g == 0):
                         # 鼠标点击进度条按钮中间
                         pyautogui.moveTo(left + 120, top + 631)
                         pyautogui.leftClick()
@@ -130,32 +132,55 @@ def main():
                 else:
                     # 电力数字区域位于92,622 大小56,18
                     # img[0:rows, 0:cols]
-                    roi = img_np[622:640,92:148]
+                    roi = img_np[622:640, 92:148]
 
                     # 将图片转化为灰色图片
                     img_gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
                     if debug:
-                        cv2.imwrite(os.path.join(tempDir, "JxBotRoi_gray.png"), img_gray)
+                        cv2.imwrite(os.path.join(
+                            tempDir, "JxBotRoi_gray.png"), img_gray)
                     # 降噪处理
                     # 二值化处理
-                    ret, img_inv = cv2.threshold(img_gray, 127, 255, cv2.THRESH_BINARY_INV)
+                    ret, img_inv = cv2.threshold(
+                        img_gray, 127, 255, cv2.THRESH_BINARY_INV)
                     if debug:
-                        cv2.imwrite(os.path.join(tempDir, "JxBotRoi_inv.png"), img_inv)
+                        cv2.imwrite(os.path.join(
+                            tempDir, "JxBotRoi_inv.png"), img_inv)
                     # 得到轮廓
-                    im2, contours, hierarchy = cv2.findContours(img_inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    im2, contours, hierarchy = cv2.findContours(
+                        img_inv, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     result = []
                     # if (contours)
                     # for contour in contours:
 
                 if is_full:
+                    time.sleep(2)
                     # 已点击，可能出现翻倍和观看广告，继续截屏判定
-                    imgPop = PIL.ImageGrab.grab(bbox=(left, top, right, bottom))
+                    imgPop = PIL.ImageGrab.grab(
+                        bbox=(left, top, right, bottom))
                     if debug:
                         imgPop.save(os.path.join(tempDir, "JxBotSC_pop.png"))
                     imgPop_np = np.array(imgPop)
-                    # 检查3个点符合分享图片取点
-                    px1 = imgPop_np[374,480]
-               
+                    # 检查2个点符合分享图片取点
+                    # 弹出对话框大小一致，但是内部黄色按钮的位置是不固定的
+                    # 我们检测蓝色的关闭按钮，如果有按钮特征则视为有弹窗
+                    # 109,196,252
+                    px1_r, px1_g, px1_b = imgPop_np[660, 240]
+                    # 226,242,255
+                    px2_r, px2_g, px2_b = imgPop_np[672, 240]
+                    if (px1_r == 109 and px1_g == 196 and px1_b == 252 and
+                            px2_r == 226 and px2_g == 242 and px2_b == 255):
+                        # 检测到弹出对话框，点击关闭它
+                        # 知道了、分享加倍、
+                        pyautogui.moveTo(left + 240, top + 560)
+                        pyautogui.leftClick()
+                        time.sleep(10)
+                        
+                    # 自动加下电力
+                    # time.sleep(2)
+                    # pyautogui.moveTo(left + 240, top + 750)
+                    # pyautogui.leftClick()
+
                 # 一分钟后继续检测
                 time.sleep(60)
         else:
