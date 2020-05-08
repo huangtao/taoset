@@ -49,11 +49,13 @@ succNum = 0
 
 is_run = 0
 
+
 def get_screen_size():
     """获取缩放后的分辨率"""
     w = win32api.GetSystemMetrics(0)
     h = win32api.GetSystemMetrics(1)
     return w, h
+
 
 screen_size = get_screen_size()
 print(screen_size)
@@ -85,10 +87,17 @@ radio2 = tk.Radiobutton(window, text="提醒模式", value=2, variable=varRadio)
 radio2.place(x=120, y=0, anchor=tk.NW)
 varRadio.set("2")
 
+
+def onCheckDebug():
+    debug = int(varDebug.get())
+    print(debug)
+
+
 varDebug = tk.IntVar()
-cbDebug = tk.Checkbutton(window, text="调试模式", variable=varDebug)
+cbDebug = tk.Checkbutton(
+    window, text="调试模式", variable=varDebug, command=onCheckDebug)
 cbDebug.place(x=0, y=70, anchor=tk.NW)
-varDebug.set(1)
+varDebug.set(0)
 
 
 varBtnTile = tk.Variable()
@@ -128,7 +137,7 @@ varDebugInfo.set("#涛我喜欢#")
 
 
 # 自动模式运行函数
-def runAutoMode(hwnd):
+def runAutoMode(hwnd, double):
     global mode, is_auto_add, debug, succNum
     try:
         # 已经运行
@@ -159,7 +168,13 @@ def runAutoMode(hwnd):
                 cv2.imwrite(os.path.join(
                     tempDir, "JxBotRoi.png"), img_roi)
             # 取62,11的像素RBG如果等于(255,177,0) 则已100%
-            g, b, r = img_roi[9, 52]
+            check_x = 9
+            check_y = 52
+            if double == 0:
+                # 不翻倍
+                check_y = 50
+            g, b, r = img_roi[check_x, check_y]
+            # print(r,g,b)
             varDebugInfo.set("r=" + str(r) + ",g=" + str(g) + ",b=" + str(b))
             if (r ==
                     255 and b == 177 and g == 0):
@@ -309,6 +324,10 @@ def runTipMode(hwnd):
         if is_full:
             toaster.show_toast("京喜工厂助手提醒您收电力啦！", duration=5)
 
+    except Exception as e:
+        varDebugInfo.set(e.args)
+        print(e)
+    finally:
         # 释放资源
         win32gui.DeleteObject(saveBitmap.GetHandle())
         saveDC.DeleteDC()
@@ -318,9 +337,6 @@ def runTipMode(hwnd):
         # 30s后继续检测
         varDebugInfo.set("30秒后将再次检查!")
         time.sleep(30)
-    except Exception as e:
-        varDebugInfo.set(e.args)
-        print(e)
 
 
 # 线程函数
@@ -335,7 +351,7 @@ def myThread():
             else:
                 rm = int(varRadio.get())
                 if rm == 1:
-                    runAutoMode(hwnd)
+                    runAutoMode(hwnd, 0)
                 else:
                     runTipMode(hwnd)
         else:
