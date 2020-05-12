@@ -7,6 +7,8 @@ class Positioner:
         self.surface = surface
         self.x = 0
         self.y = 0
+        self.startX = 0
+        self.startY = 0
         self.oldX = 0
         self.oldY = 0
         self.direction = 0
@@ -23,11 +25,98 @@ class Positioner:
         else:
             self.direction += directionVal
 
+    def isMoved(self):
+        if (self.oldX != self.x or self.oldY != self.y):
+            return True
+        else:
+            return False
+
+    def isMustBack(self):
+        # 是否离太远了。回去
+        if abs(self.x - self.startX) > 200 or ads(self.y - self.startY) > 200:
+            print('i am back')
+            return True
+        else:
+            return False
+
     def updatePosition(self):
         self.oldX = self.x
         self.oldY = self.y
 
         if (self.direction == 0):
+            self.x += 0
+            self.y += 6
+        elif (self.direction == 15):
+            self.x += 1
+            self.y += 5
+        elif (self.direction == 30):
+            self.x += 2
+            self.y += 4
+        elif (self.direction == 45):
+            self.x += 3
+            self.y += 3
+        elif (self.direction == 60):
+            self.x += 4
+            self.y += 2
+        elif (self.direction == 75):
+            self.x += 5
+            self.y += 1
+        elif (self.direction == 90):
+            self.x += 6
+            self.y += 0
+        elif (self.direction == 105):
+            self.x += 5
+            self.y += -1
+        elif (self.direction == 120):
+            self.x += 4
+            self.y += -2
+        elif (self.direction == 135):
+            self.x += 3
+            self.y += -3
+        elif (self.direction == 150):
+            self.x += 2
+            self.y += -4
+        elif (self.direction == 165):
+            self.x += 1
+            self.y += -5
+        elif (self.direction == 180):
+            self.x += 0
+            self.y += -6
+        elif (self.direction == 195):
+            self.x += -1
+            self.y += -5
+        elif (self.direction == 210):
+            self.x += -2
+            self.y += -4
+        elif (self.direction == 225):
+            self.x += -3
+            self.y += -3
+        elif (self.direction == 240):
+            self.x += -4
+            self.y += -2
+        elif (self.direction == 255):
+            self.x += -5
+            self.y += -1
+        elif (self.direction == 270):
+            self.x += -6
+            self.y += 0
+        elif (self.direction == 285):
+            self.x += -5
+            self.y += 1
+        elif (self.direction == 300):
+            self.x += -4
+            self.y += 2
+        elif (self.direction == 315):
+            self.x += -3
+            self.y += 3
+        elif (self.direction == 330):
+            self.x += -2
+            self.y += 4
+        elif (self.direction == 345):
+            self.x += -1
+            self.y += 5
+        elif (self.direction == 360):
+            self.direction = 0
             self.x += 0
             self.y += 6
 

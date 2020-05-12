@@ -3,41 +3,43 @@ import time
 import cv2
 import win32gui
 import random
-import mss
-from config import *
+import numpy as np
+import config
 
 
-def centerScreen(coord, positioner):
-    (left, top, right, bottom) = win32gui.GetWindowRect(hwnd)
+def centerScreen(coord, positioner, fighting):
+    if (config.hwnd == 0):
+        return True
+    if (fighting):
+        return True
+    (left, top, right, bottom) = win32gui.GetWindowRect(config.hwnd)
     width = right - left
 
     if (coord > 0):
         # 目标是否在中间位置
         if (abs(width/2-coord) < 150):
-            pyautogui.keyUp('d')
-            pyautogui.keyUp('a')
             return True
 
         # 目标是否在右边
         elif (coord > width / 2):
-            pyautogui.keyDown('d')
+            pyautogui.keyDown('right')
             time.sleep(0.05)
-            pyautogui.keyUp('d')
+            pyautogui.keyUp('right')
             positioner.updateDirection(positioner.direction + 15)
             return False
 
         # 目标是否在左边
         elif (coord < width / 2):
-            pyautogui.keyDown('a')
+            pyautogui.keyDown('left')
             time.sleep(0.05)
-            pyautogui.keyUp('a')
+            pyautogui.keyUp('left')
             positioner.updateDirection(positioner.direction - 15)
             return False
 
 
 def releaseControls():
-    pyautogui.keyUp('d')
-    pyautogui.keyUp('a')
+    pyautogui.keyUp('right')
+    pyautogui.keyUp('left')
 
 
 def moveAboutMap(positioner):
@@ -50,46 +52,68 @@ def stopMovement(positioner):
 
 def moveSideWays(positioner):
     choice = random.randint(0, 1)
+    choice = 0
 
     if (choice == 1):
-        pyautogui.keyDown('a')
+        pyautogui.keyDown('left')
         time.sleep(0.15)
-        pyautogui.keyUp('a')
+        pyautogui.keyUp('left')
         positioner.updateDirection(-45)
     else:
-        pyautogui.keyDown('d')
+        pyautogui.keyDown('right')
         time.sleep(0.15)
-        pyautogui.keyUp('d')
+        pyautogui.keyUp('right')
         positioner.updateDirection(45)
 
+    choice = random.randint(0, 100)
+    if (choice < 10):
+        pyautogui.press('space')
+
+
 # 是否在攻击范围内
+# 我们检查动作条数字是否是红色来判定
 
 
 def castRangeCheck(img):
     pyautogui.press('1')
 
-    # 提示不在攻击范围红色文字
-    inRangeTextImg = img[830:880, 800:1100]
-    hsv = cv2.cvtColor(inRangeTextImg cv2.COLOR_BGR2HSV)
+    # 动作条文字1是否红色
+    inRangeTextImg = img[631:638, 36:38]
+    hsv = cv2.cvtColor(inRangeTextImg, cv2.COLOR_BGR2HSV)
 
-    lower_yellow = np.array([20, 200, 200])
-    upper_yellow = np.array([50, 255, 255])
+    # lower_yellow = np.array([20, 200, 200])
+    # upper_yellow = np.array([50, 255, 255])
 
     lower_red = np.array([0, 200, 200])
     upper_red = np.array([20, 255, 255])
 
-    yellowMask = cv2.inRange(hsv, lower_yellow, upper_yellow)
+    # yellowMask = cv2.inRange(hsv, lower_yellow, upper_yellow)
     redMask = cv2.inRange(hsv, lower_red, upper_red)
+    if (config.debug):
+        cv2.imwrite("can_attack.png", inRangeTextImg)
+        cv2.imwrite("can_attack_mask.png", redMask)
 
     # 得到轮廓
-    yellowContours, _ = cv2.findContours(
-        yellowMask, cv2.RETR_THEE, cv2.CHAIN_APPROX_NONE)
+    # yellowContours, _ = cv2.findContours(
+    #     yellowMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
     redContours, _ = cv2.findContours(
-        redMask, cv2.RETR_THEE, cv2.CHAIN_APPROX_NONE)
+        redMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
 
-    CV2.imshow("castRange", inRangeTextImg)
+    if (redContours):
+        return False
+    else:
+        return True
 
-    if (yellowContours or redContours):
+
+def checkMapMovement(img1, img2):
+    originalMiniMapImg = img1[25:158, 17:150]
+    newMiniMapImg = img2[25:158, 17:150]
+
+    difference = newMiniMapImg - originalMiniMapImg
+    distance = (difference.astype(float)**2).sum(axis=2)
+
+    if (distance.sum() > 100000000):
+        #val = (abs(100000000 - distance.sum())) / 10
         return True
     else:
         return False

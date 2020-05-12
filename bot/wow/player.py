@@ -53,3 +53,24 @@ def getCurrentBar(img):
         health = str(int((healthArea / maxHealth) * 100))
 
     return health, mana
+
+# 检查是否有战斗标记(交叉的剑)
+def isFighting(img):
+    img_check = img[45:64, 4:22]
+    #cv2.imshow("bar", img_check)
+
+    hsv = cv2.cvtColor(img_check, cv2.COLOR_BGR2HSV)
+
+    lower_white = np.array([0, 0, 221])
+    upper_white = np.array([180, 30, 255])
+
+    whiteMask = cv2.inRange(hsv, lower_white, upper_white)
+
+    # 得到魔法值轮廓
+    whiteContours, _ = cv2.findContours(
+        whiteMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+
+    if (whiteContours):
+        return True
+    else:
+        return False
