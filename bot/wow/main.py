@@ -37,16 +37,20 @@ from control import *
 
 
 def main():
+    FPS = 10
+    fpsClock = pygame.time.Clock()
+
     pygame.init()
     pygame.font.init()
     myfont = pygame.font.SysFont('SimHei', 16)
 
-    size = width, height = 1000, 1000
+    size = width, height = 480, 320
     white = 255, 255, 255
     black = 0, 0, 0
     rangeChecked = False
 
     # 创建一个窗口
+    os.environ['SDL_VIDEO_WINDOW_POS'] = "%d,%d" % (1100, 100)
     screen = pygame.display.set_mode(size)
 
     targetCoord = 0
@@ -62,24 +66,29 @@ def main():
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                # saveConfig()
                 sys.exit()
 
         # 绘制一个矩形
-        pygame.draw.rect(screen, (150, 100, 200), (700, 100, 200, 100))
+        pygame.draw.rect(screen, (150, 100, 200), (400, 0, 80, 80))
         mouse = pygame.mouse.get_pos()
         # print(mouse)
         click = pygame.mouse.get_pressed()
-        if (mouse[0] >= 700 and mouse[0] <= 900 and mouse[0] >= 100 and mouse[1] <= 200 and click[0] == 1):
+        if (mouse[0] >= 400 and mouse[0] <= 480 and mouse[0] >= 0 and mouse[1] <= 80 and click[0] == 1):
             # 如果在矩形区域内单击表示游戏启动
             hwnd = win32gui.FindWindow("GxWindowClass", "魔兽世界")
             if hwnd == 0:
-                print("魔兽世界没有运行!")
+                textImage = myfont.render("魔兽世界没有运行!", True, black)
+                screen.blit(textImage, (0, 20))
             else:
                 gameStarted = True
-
-        textImage = myfont.render("程序为研究编写，严禁用于商业目的!", True, black)
-        screen.blit(textImage, (0, 0))
+        else:
+            textImage = myfont.render("程序为研究编写，严禁用于商业目的!", True, black)
+            screen.blit(textImage, (0, 20))
+        fpsImage = myfont.render("FPS - " + str(FPS), True, black)
+        screen.blit(fpsImage, (0, 0))
         pygame.display.flip()
+        fpsClock.tick(FPS)
 
     config.setHwnd(hwnd)
     # 初始化示意表面
@@ -97,6 +106,7 @@ def main():
     is_fighting = False
     midY = 0
     time_try_attack = 0
+    time_start_water = 0
     tab_num = 1
 
     # tab是比较智能的。优先选取正前方单位
@@ -110,6 +120,7 @@ def main():
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                # saveConfig()
                 sys.exit()
 
         win32api.keybd_event(13, 0, 0, 0)
@@ -119,6 +130,7 @@ def main():
             continue
 
         (left, top, right, bottom) = win32gui.GetWindowRect(hwnd)
+        setWinPos(left, top)
 
         # 游戏窗口尺寸
         window_w = right - left - sc_offset_left - sc_offset_right
@@ -182,66 +194,90 @@ def main():
                 gameState = 'findTarget'
             elif (target == "enemy" or (kill_neutral and target == "neutral")):
                 if (gameState == 'findTarget'):
+                    enemyHelth, enemyMana = getTargetBar(targetStatsImg)
                     # 能攻击进入尝试攻击状态
                     isInRange = castRangeCheck(worldViewImg)
                     # 目标在攻击范围内
-                    if (isInRange):
+                    if (isInRange and (enemyHelth != '' and int(enemyHelth) > 0)):
                         gameState = 'tryAttack'
 
             if (gameState == 'findTarget'):
-                # TAB三次后才开始移动
-                # 按TAB键
-                if (debug_step):
-                    win32api.keybd_event(13, 0, 0, 0)
-                    win32gui.SetForegroundWindow(hwnd)
-                pyautogui.press('tab')
-                rangeChecked = False
-                tab_num += 1
-                tab_num = 0
-                if (tab_num >= 3):
-                    # 需要移动了
+                # 先检查蓝
+                if (mana == '' or int(mana) < 30):
+                    gameState = 'water'
+                    pyautogui.press('-')
+                    pyautogui.press('=')
+                    time_start_water = datetime.datetime.now()
+                else:
+                    # TAB三次后才开始移动
+                    # 按TAB键
                     if (debug_step):
                         win32api.keybd_event(13, 0, 0, 0)
                         win32gui.SetForegroundWindow(hwnd)
-                    moveAboutMap(positioner)
-                    # 我们已经在移动了(没有卡住),继续调用移动w
-                    # moving = checkMapMovement(miniMapImg1, miniMapImg2)
-                    moving = positioner.isMoved()
-                    if (moving):
-                        positioner.updatePosition()
-                        positioner.drawLinesFromData()
-                        isLeave = positioner.isMustBack()
-                        if (isLeave):
+                    pyautogui.press('tab')
+                    rangeChecked = False
+                    tab_num += 1
+                    # for debug
+                    tab_num = 0
+                    if (tab_num >= 3):
+                        # 需要移动了
+                        if (debug_step):
+                            win32api.keybd_event(13, 0, 0, 0)
+                            win32gui.SetForegroundWindow(hwnd)
+                        moveAboutMap(positioner)
+                        # 我们已经在移动了(没有卡住),继续调用移动w
+                        # moving = checkMapMovement(miniMapImg1, miniMapImg2)
+                        moving = positioner.isMoved()
+                        if (moving):
+                            positioner.updatePosition()
+                            positioner.drawLinesFromData()
+                            isLeave = positioner.isMustBack()
+                            if (isLeave):
+                               moveSideWays(positioner)
+                        else:
+                            # 没有移动或者太远了转向
                             moveSideWays(positioner)
-                    else:
-                        # 没有移动或者太远了转向
-                        moveSideWays(positioner)
 
-                continue
+            elif (gameState == 'water'):
+                if (int(mana) >= 100):
+                    pyautogui.press('space')
+                    gameState = 'findTarget'
+                else:
+                    curr_time = datetime.datetime.now()
+                    durn = (curr_time - time_start_water).seconds
+                    if (durn >= 18):
+                        pyautogui.press('-')
+                        pyautogui.press('=')
+                        time_start_water = curr_time
+
             elif (gameState == 'tryAttack'):
                 # 停止移动尝试攻击
                 stopMovement(positioner)
                 pyautogui.press('1')
                 time_try_attack = datetime.datetime.now()
                 gameState = 'checkAttack'
-                continue
+
             elif (gameState == 'checkAttack'):
                 # 检查是否进入了战斗状态
                 curr_time = datetime.datetime.now()
-                durn = (curr_time - time_try_attack).seconds
-                if (durn >= 3):
+                durn = (curr_time - time_try_attack).microseconds / 1000
+                if (durn > 1800):
                     # 进入战斗状态
                     is_fighting = isFighting(playerStatsImg)
                     if (is_fighting):
-                        gameState == 'fighting'
+                        gameState = 'fighting'
                     else:
                         # 没有进入战斗状态
                         gameState = 'findTarget'
                 else:
                     pyautogui.press('1')
-                continue
+
             elif (gameState == 'fighting'):
                 pyautogui.press('1')
+
+            else:
+                print("未知状态")
+                gameState = "findTarget"
 
             # 更新界面
             stateText = myfont.render(
@@ -256,10 +292,9 @@ def main():
             screen.blit(stateText, (0, 0))
             screen.blit(playerHealthText, (0, 20))
             screen.blit(playerManaText, (0, 40))
-            screen.blit(mapSurface, (0, 300))
+            # screen.blit(mapSurface, (0, 300))
             pygame.display.flip()
-
-        screen.fill(white)
+            fpsClock.tick(FPS)
 
 
 main()
