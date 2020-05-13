@@ -97,6 +97,7 @@ def main():
     is_fighting = False
     midY = 0
     time_try_attack = 0
+    tab_num = 1
 
     # tab是比较智能的。优先选取正前方单位
     pyautogui.press('tab')
@@ -174,128 +175,31 @@ def main():
             # 目标
             target = getTargetStats(targetStatsImg)
 
-            playerHealthText = myfont.render(
-                "我的生命值: " + health + "%", False, (0, 0, 0))
-            playerManaText = myfont.render(
-                "我的魔法值: " + mana + "%", False, (0, 0, 0))
+            # # debug
+            # is_fighting = isFighting(playerStatsImg)
 
             if (target == ""):
                 gameState = 'findTarget'
-                if (target == "enemy" or (kill_neutral and target == "neutral")):
-                    # 得到目标坐标
-                    coord, canSeeTarget, midY = getTargetCoor(worldViewImg)
-                    targetCoord = coord
-                    targetSeen = canSeeTarget
-                else:
-                    targetSeen = False
-            else:
-                is_fighting = False
-
-            if (not is_fighting):
-                # 是否喝水
-                if (mana == '' or int(mana) < 30):
-                    gamestate = 'water'
-                    pyautogui.press('-')
-                    pyautogui.press('=')
-                    is_water = True
-                    time_start_water = datetime.datetime.now()
-                    continue
-                if (is_water):
-                    if (health == 100 and mana == 100):
-                        is_water = False
-                        continue
-                    curr_time = datetime.datetime.now()
-                    durn = (curr_time - time_start_water).seconds
-                    if (durn > 18):
-                        is_water = False
-                    continue
-
-            screen.fill(white)
-
-            if (target == "enemy" or (kill_neutral and target == "neutral")):
-                stopMovement(positioner)
-
-                playerCurrentTarget = myfont.render(
-                    "当前目标: " + target, False, (0, 0, 0))
-                enemyHelth, enemyMana = getTargetBar(targetStatsImg)
-                currTargetStats = myfont.render(
-                    "目标生命: " + enemyHelth, False, (0, 0, 0))
-                screen.blit(currTargetStats, (0, 80))
-                screen.blit(playerCurrentTarget, (0, 40))
-
-                # 尝试攻击
-                if (gamestate == 'findTarget'):
-                    # 能攻击吗
-                    if (not rangeChecked):
-                        isInRange = castRangeCheck(worldViewImg)
+            elif (target == "enemy" or (kill_neutral and target == "neutral")):
+                if (gameState == 'findTarget'):
+                    # 能攻击进入尝试攻击状态
+                    isInRange = castRangeCheck(worldViewImg)
                     # 目标在攻击范围内
                     if (isInRange):
-                        rangeChecked = True
-                        pyautogui.press('1')
                         gameState = 'tryAttack'
-                        time_try_attack = int(round(time.time()*1000)
-                        # 1.5s后检查有没有进入战斗状态
-                elif (gamestate == 'tryAttack'):
-                    curr_time = int(round(time.time()*1000)
-                    durn = (curr_time - time_start_water)
-                    if (durn > 1600):
-                        # 进入战斗状态
-                        is_fighting = isFighting(playerStatsImg)
-                        if (is_fighting):
-                            gamestate == 'fighting'
-                        else:
-                            # 没有进入战斗状态
-                            gamestate = 'findTarget'
-                    continue
-                elif (gamestate == 'fighting')
-                    pyautogui.press('1')
 
-                if (targetSeen and (target == "enemy" or (kill_neutral and target == "neutral"))):
-                    losText = myfont.render("目标在视野中", False, (0, 0, 0))
-                    screen.blit(losText, (0, 60))
-
-                    # 能攻击吗
-                    if (not rangeChecked):
-                        isInRange = castRangeCheck(worldViewImg)
-                    # 目标在攻击范围内
-                    if (isInRange):
-                        rangeChecked = True
-                        pyautogui.press('1')
-                        is_fighting = True
-
-                    else:
-                        pyautogui.keyDown('w')
-                        time.sleep(0.25)
-                        pyautogui.keyUp('w')
-                        positioner.updatePosition()
-                        positioner.drawLinesFromData()
-                    # # 镜头只调整一次
-                    # isCentered = centerScreen(targetCoord, positioner, is_fighting)
-                    # if (isCentered):
-
-                elif (not targetSeen):
-                    is_fighting = False
-                    losText = myfont.render("目标不在视野中", False, (0, 0, 0))
-                    screen.blit(losText, (0, 60))
-                    # 取消目标
-                    pyautogui.press('esc')
-                    pyautogui.press('tab')
-
-            # 没有敌对目标
-            else:
-                is_fighting = False
-                # 按TAB键w
+            if (gameState == 'findTarget'):
+                # TAB三次后才开始移动
+                # 按TAB键
                 if (debug_step):
                     win32api.keybd_event(13, 0, 0, 0)
                     win32gui.SetForegroundWindow(hwnd)
                 pyautogui.press('tab')
                 rangeChecked = False
-                releaseControls()
-
-                # 继续检查目标
-                target = getTargetStats(targetStatsImg)
-
-                if (target != "enemy" or (kill_neutral and target != "neutral")):
+                tab_num += 1
+                tab_num = 0
+                if (tab_num >= 3):
+                    # 需要移动了
                     if (debug_step):
                         win32api.keybd_event(13, 0, 0, 0)
                         win32gui.SetForegroundWindow(hwnd)
@@ -313,9 +217,45 @@ def main():
                         # 没有移动或者太远了转向
                         moveSideWays(positioner)
 
+                continue
+            elif (gameState == 'tryAttack'):
+                # 停止移动尝试攻击
+                stopMovement(positioner)
+                pyautogui.press('1')
+                time_try_attack = datetime.datetime.now()
+                gameState = 'checkAttack'
+                continue
+            elif (gameState == 'checkAttack'):
+                # 检查是否进入了战斗状态
+                curr_time = datetime.datetime.now()
+                durn = (curr_time - time_try_attack).seconds
+                if (durn >= 3):
+                    # 进入战斗状态
+                    is_fighting = isFighting(playerStatsImg)
+                    if (is_fighting):
+                        gameState == 'fighting'
+                    else:
+                        # 没有进入战斗状态
+                        gameState = 'findTarget'
+                else:
+                    pyautogui.press('1')
+                continue
+            elif (gameState == 'fighting'):
+                pyautogui.press('1')
+
+            # 更新界面
+            stateText = myfont.render(
+                "阶段: " + gameState, False, (0, 0, 0))
+            playerHealthText = myfont.render(
+                "我的生命值: " + health + "%", False, (0, 0, 0))
+            playerManaText = myfont.render(
+                "我的魔法值: " + mana + "%", False, (0, 0, 0))
+
+            screen.fill(white)
             # print(positioner.direction)
-            screen.blit(playerHealthText, (0, 0))
-            screen.blit(playerManaText, (0, 20))
+            screen.blit(stateText, (0, 0))
+            screen.blit(playerHealthText, (0, 20))
+            screen.blit(playerManaText, (0, 40))
             screen.blit(mapSurface, (0, 300))
             pygame.display.flip()
 

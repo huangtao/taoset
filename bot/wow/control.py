@@ -42,7 +42,7 @@ def releaseControls():
     pyautogui.keyUp('left')
 
 
-def moveAboutMap(positioner):
+def startMovement(positioner):
     pyautogui.keyDown('w')
 
 
@@ -117,3 +117,8 @@ def checkMapMovement(img1, img2):
         return True
     else:
         return False
+
+# 发现拾取
+def findPickup(img):
+    nopickup = True
+    return nopickup

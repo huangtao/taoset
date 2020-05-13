@@ -3,8 +3,7 @@ import pygame
 
 class Positioner:
 
-    def __init__(self, surface):
-        self.surface = surface
+    def __init__(self):
         self.x = 0
         self.y = 0
         self.startX = 0
@@ -121,9 +120,4 @@ class Positioner:
             self.y += 6
 
     def drawLinesFromData(self):
-        width, height = self.surface.get_size()
-        halfWidth = int(width / 2)
-        halfHeight = int(height / 2)
-
-        pygame.draw.line(self.surface, (0, 0, 0), (halfWidth+self.oldX,
-                                                   halfHeight+self.oldY), (halfWidth+self.x, halfHeight+self.y), 2)
+        print("x=%d,y=%d,direction=%d" % (self.x, self.y, self.direction))

@@ -20,8 +20,8 @@ def getCurrentBar(img):
 
     hsv = cv2.cvtColor(img_bar, cv2.COLOR_BGR2HSV)
 
-    mana = ""
-    health = ""
+    mana = 0
+    health = 0
 
     lower_blue = np.array([100, 200, 80])
     upper_blue = np.array([120, 255, 255])
@@ -42,7 +42,7 @@ def getCurrentBar(img):
         manaArea = cv2.contourArea(contour)
         if manaArea > maxMana:
             maxMana = manaArea
-        mana = str(int((manaArea / maxMana) * 100))
+        mana = int((manaArea / maxMana) * 100)
 
     greenContours, _ = cv2.findContours(
         greenMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
@@ -50,7 +50,7 @@ def getCurrentBar(img):
         healthArea = cv2.contourArea(contour)
         if healthArea > maxHealth:
             maxHealth = healthArea
-        health = str(int((healthArea / maxHealth) * 100))
+        health = int((healthArea / maxHealth) * 100)
 
     return health, mana
 

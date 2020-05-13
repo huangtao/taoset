@@ -58,14 +58,13 @@ def getTargetStats(img):
     return target
 
 
+# 根据目标脚下的圆环得到她包围矩形的中心点坐标
 def getTargetCoor(img):
     # 动作条，人物后面不用检测
-    img_check = img[0:380, 0:990]
+    img_check = img[0:580, 0:990]
 
     mid_x = 0
     mid_y = 0
-    coord = 0
-    canSeeTarget = False
 
     hsv = cv2.cvtColor(img_check, cv2.COLOR_BGR2HSV)
 
@@ -122,7 +121,7 @@ def getTargetCoor(img):
                 mid_x = int(M["m10"] / M["m00"])
                 mid_y = int(M["m01"] / M["m00"])
 
-    return coord, canSeeTarget, mid_y
+    return mid_x, mid_y
 
 
 def getTargetBar(img):
@@ -132,8 +131,8 @@ def getTargetBar(img):
     img_bar = img[30:52, 1:121]
     hsv = cv2.cvtColor(img_bar, cv2.COLOR_BGR2HSV)
 
-    mana = ""
-    health = ""
+    mana = 0
+    health = 0
 
     lower_blue = np.array([100, 200, 80])
     upper_blue = np.array([120, 255, 255])
@@ -151,7 +150,7 @@ def getTargetBar(img):
         manaArea = cv2.contourArea(contour)
         if manaArea > maxMana:
             maxMana = manaArea
-        mana = str(int((manaArea / maxMana) * 100))
+        mana = int((manaArea / maxMana) * 100)
 
     greenContours, _ = cv2.findContours(
         greenMask, cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
@@ -159,6 +158,6 @@ def getTargetBar(img):
         healthArea = cv2.contourArea(contour)
         if healthArea > maxHealth:
             maxHealth = healthArea
-        health = str(int((healthArea / maxHealth) * 100))
+        health = int((healthArea / maxHealth) * 100)
 
     return health, mana
