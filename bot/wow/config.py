@@ -1,4 +1,7 @@
+import os
 import pyautogui
+import configparser
+import win32gui
 
 # 是否调试
 debug = True
@@ -37,3 +40,18 @@ kill_neutral = True
 def setHwnd(h):
     global hwnd
     hwnd = h
+
+
+def getZhiye():
+    return zhiye
+
+def setWinPos(left, top):
+    global win_x,win_y
+
+    win_x = left
+    win_y = top
+
+def saveConfig():
+    conf.set("config", "win_x", str(win_x))
+    conf.set("config", "win_y", str(win_y))
+    conf.write(open(config_path), 'w')
