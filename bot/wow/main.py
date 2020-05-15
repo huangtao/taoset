@@ -192,7 +192,7 @@ def main():
                     if (debug_step):
                         win32api.keybd_event(13, 0, 0, 0)
                         win32gui.SetForegroundWindow(hwnd)
-                    if fixPosition == False:
+                    if backrun == False:
                         if is_moving == False:
                             startMovement(positioner)
                             is_moving = True

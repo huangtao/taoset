@@ -12,8 +12,11 @@ hwnd = 0
 # 是否拾取(极大影响升级效率)
 doPickup = False
 
-# 是否原地刷怪
-fixPosition = True
+# 是否后台运行(只在原地刷怪升级)
+backrun = True
+
+# 是否自动吃喝
+doWater = False
 
 # 获取当前屏幕分辨率
 screenWidth, screenHeight = pyautogui.size()
