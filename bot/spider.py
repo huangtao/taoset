@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 #
 # 爬取http://www.howzf.com/esf/xq_index_474467462.htm页面数据
+# 参考文章:
+# 1. https://blog.csdn.net/Jeeson_Z/article/details/82047685
 #
 
 from selenium import webdriver
