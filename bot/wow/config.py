@@ -16,10 +16,10 @@ hwnd = 0
 doPickup = False
 
 # 是否后台运行(只在原地刷怪升级)
-backrun = True
+backrun = False
 
 # 是否自动吃喝
-doWater = False
+doWater = True
 
 # 获取当前屏幕分辨率
 screenWidth, screenHeight = pyautogui.size()
