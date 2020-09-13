@@ -5,6 +5,14 @@
 # 1. https://blog.csdn.net/Jeeson_Z/article/details/82047685
 #
 
+import os
+import base64
+import time
+import io
+import numpy as np
+import cv2 as cv
+import requests
+
 from selenium import webdriver
 from selenium.webdriver.support.wait import WebDriverWait
 from urllib.request import urlretrieve
@@ -14,306 +22,237 @@ from PIL import Image
 
 def init():
     # 全局变量
-    global url, browser, wait
+    global url, browser, wait, debug
+    debug = True
     url = 'http://www.howzf.com/esf/xq_index_474467462.htm'
-    browser = webdriver.Chrome()
+    if debug:
+        # 打开浏览器
+        browser = webdriver.Chrome()
+    else:
+        # 打开浏览器(不弹出浏览器页面)
+        browser = webdriver.PhantomJS()
     wait = WebDriverWait(browser, 20)
+
+
+# 识别页面情况
+# 0 - 验证码页面
+# 1 - 目标数据页面
+# -1 - 错误
+def get_page_type():
+    try:
+        # 判断是否有<div class='info ip'
+        soup = BeautifulSoup(browser.page_source, 'lxml')
+        tag = soup.find_all('div', class_='info ip')
+        if len(tag) > 0:
+            # 是验证页面
+            return 0
+        else:
+            return 1
+    except BaseException as msg:
+        print(msg)
+        return -1
+
+
+def cv2_crop(im, box):
+    '''cv2实现类似PIL的裁剪
+
+    :param im: cv2加载好的图像
+    :param box: 裁剪的矩形，(left, upper, right, lower)元组
+    '''
+    return im.copy()[box[1]:box[3], box[0]:box[2], :]
+
+
+def get_transparency_location(image):
+    '''获取基于透明元素裁切图片的左上角、右下角坐标
+
+    :param image: cv2加载好的图像
+    :return: (left, upper, right, lower)元组
+    '''
+    # 1. 扫描获得最左边透明点和最右边透明点坐标
+    height, width, channel = image.shape  # 高、宽、通道数
+    assert channel == 4  # 无透明通道报错
+    first_location = None  # 最先遇到的透明点
+    last_location = None  # 最后遇到的透明点
+    first_transparency = []  # 从左往右最先遇到的透明点，元素个数小于等于图像高度
+    last_transparency = []  # 从左往右最后遇到的透明点，元素个数小于等于图像高度
+    for y, rows in enumerate(image):
+        for x, BGRA in enumerate(rows):
+            alpha = BGRA[3]
+            if alpha != 0:
+                if not first_location or first_location[1] != y:  # 透明点未赋值或为同一列
+                    first_location = (x, y)  # 更新最先遇到的透明点
+                    first_transparency.append(first_location)
+                last_location = (x, y)  # 更新最后遇到的透明点
+        if last_location:
+            last_transparency.append(last_location)
+
+    # 2. 矩形四个边的中点
+    top = first_transparency[0]
+    bottom = first_transparency[-1]
+    left = None
+    right = None
+    for first, last in zip(first_transparency, last_transparency):
+        if not left:
+            left = first
+        if not right:
+            right = last
+        if first[0] < left[0]:
+            left = first
+        if last[0] > right[0]:
+            right = last
+
+    # 3. 左上角、右下角
+    upper_left = (left[0], top[1])  # 左上角
+    bottom_right = (right[0], bottom[1])  # 右下角
+
+    return upper_left[0], upper_left[1], bottom_right[0], bottom_right[1]
+
+
+# 模式匹配识别
+# 找出图片中的最佳匹配位置
+# 返回需要移动的距离
+def findPic(type_str):
+    # 读取滑块背景图片
+    img_bg = cv.imread('yz_bg.png')
+    img_bg_gray = cv.cvtColor(image_bg, cv.COLOR_BGR2GRAY)
+    # 读取滑块图片(灰度模式)
+    image_slider = cv.imread('yz_slider.png', 0)
+    slider_h, slider_w = image_slider.shape[:2]
+    # 在滑块背景图中匹配滑块
+    result = cv.matchTemplate(image_bg_gray, image_slider, cv.TM_SQDIFF_NORMED)
+    min_val, max_val, min_loc, max_loc = cv.minMaxLoc(result)
+    # CV_TM_SQDIFF和CV_TM_SQDIFF_NORMED模式min_val越接近0匹配度越好，匹配位置取min_loc
+    # 其他方法max_val越接近1匹配度越好，匹配位置取max_loc
+    if debug == True:
+        # 目标位置绘制一个红色矩形
+        cv.rectangle(image_bg, min_loc,
+                     (min_loc[0]+slider_w, min_loc[1]+slider_h), (0, 0, 255), 2)
+        strmin_val = str(min_val)
+        cv.imshow('MatchResult---MatchingValue='+strmin_val, image_bg)
+        cv.imshow('slider', image_slider)
+        cv.waitKey(0)
+
+    value = cv.minMaxLoc(result)
+    # 获取x坐标
+    return value[2:][0][0], value[2:][1][0]
+
+
+# 模拟鼠标进行滑块验证
+# 验证码有两种类型:
+# a.是出现一个箭头滑块，鼠标到滑动进度条上才出现图片
+# b.直接图片和需要拼的小图片
+# 我们取中间的一个正方形区域，如果此区域都是白色那么我们认定是a，否则是b
+def do_identify():
+    try:
+        frame = browser.find_element_by_xpath('//iframe')
+        # 进入iframe页面
+        browser.switch_to_frame(frame)
+        soupFrame = BeautifulSoup(browser.page_source, 'lxml')
+        tagRet = soupFrame.find_all('div', class_='yidun_slider')
+        if len(tagRet) > 0:
+            # a类型
+            # 获取滑块和拼图URL下载保存
+            tagBg = soupFrame.find_all('img', class_='yidun_bg-img')
+            brUrl = tagBg[0].get('src')
+            tagJigsaw = soupFrame.find_all('img', class_='yidun_jigsaw')
+            JigsawUrl = tagJigsaw[0].get('src')
+            if len(brUrl) == 0 or len(JigsawUrl) == 0:
+                return False
+            re = requests.get(brUrl)
+            with open('yz_bg.png', 'wb') as f:
+                f.write(re.content)
+            re = requests.get(JigsawUrl)
+            with open('yz_slider.png', 'wb') as f:
+                f.write(re.content)
+            # 滑块和拼图高度是相同的,只要计算出x方向需要移动的距离即可
+            move_x, move_y = template_match('a')
+            # 将鼠标移动到滑块上
+            elHk = browser.find_elements_by_class_name('yidun_slider')
+            webdriver.ActionChains(browser).move_to_element(elHk[0]).perform()
+            webdriver.ActionChains(browser).drag_and_drop_by_offset(
+                elHk[0], move_x, 0).perform()
+            return True
+        tagRet = soupFrame.find_all('center', class_='textcontent')
+        if len(tagRet) > 0:
+            # b类型
+            # 滑块和拼图为base64信息，拿到base64保存
+            # 注意!!!
+            # b类型还有一种可能是将背景图分为24张小图片(24个div)拼接
+            # 一排12张分两排,这种情况下需要将24张base64图片数据自己拼成一张大的
+            # 此处仅做演示，返回False让他刷新吧
+            tagImg = soupFrame.find_all('center', class_='imgcontent')
+            lxIC = tagImg[0]
+            tagICDiv = lxIC.find_all('div')
+            lxICD = tagICDiv[0]
+            tagTarget = lxICD.find_all('div')
+            # 得到滑块图片
+            tagHk = tagTarget[0]
+            styleStr = tagHk.attrs['style']
+            pat = 'data:image/png;base64,'
+            posStart = styleStr.find(pat)
+            posEnd = styleStr.rfind('");')
+            if posStart == -1 or posEnd == -1:
+                return False
+            hkBase64 = styleStr[posStart+len(pat):posEnd]
+            with open('yz_slider.png', 'wb') as f:
+                f.write(base64.b64decode(hkBase64))
+            # 为了统一应对，使用截图方式得到拼图图片
+            # # 得到拼图图片
+            # tagBg = tagTarget[1]
+            # styleStr = tagBg.attrs['style']
+            # posStart = styleStr.find(pat)
+            # posEnd = styleStr.rfind('");')
+            # if posStart == -1 or posEnd == -1:
+            #     return False
+            # bgBase64 = styleStr[posStart+len(pat):posEnd]
+            # with open('yz_bg.png', 'wb') as f:
+            #     f.write(base64.b64decode(hkBase64))
+
+            browser.get_screenshot_as_file('sc.png')
+            sc_img = Image.open('sc.png')
+            box = (sc_img.width/2-123, sc_img.height/2-58,
+                   sc_img.width/2+137, sc_img.height/2+60)
+            center_img = sc_img.crop(box)
+            center_img.save('yz_bg.png')
+
+            move_x, move_y = template_match('b')
+            # 将鼠标移动到滑块上
+            elImgContent = browser.find_elements_by_class_name('imgcontent')
+            elContent = elImgContent[0].find_elements_by_tag_name('div')
+            elDiv = elContent[0].find_elements_by_tag_name('div')
+            webdriver.ActionChains(browser).move_to_element(elDiv[0]).perform()
+            webdriver.ActionChains(browser).drag_and_drop_by_offset(
+                elDiv[0], move_x, move_y).perform()
+            return True
+        print("主人:对方添加了新的验证页面类型，请匹配!")
+        return False
+    except BaseException as msg:
+        print(msg)
+        return False
+
+
+# 主程序
+def main():
+    # 初始化
+    init()
     # 打开页面
     browser.get(url)
+    time.sleep(2)
+    while True:
+        # 判定页面类型
+        page_type = get_page_type()
+        if page_type == 0:
+            do_identify()
+        elif page_type == 1:
+            print(browser.page_source)
+            # 演示用，延迟10S后刷新页面
+            time.sleep(10)
+            browser.get(url)
+        else:
+            browser.get(url)
+        time.sleep(2)
 
 
-# 获取滑块验证图片
-def get_image_info(img):
-    # 网页转化为lxml
-    soup = BeautifulSoup(browser.page_source, 'lxml')
-    # 验证图片标签
-    imgs = soup.find_all('div', {'class': 'gt_cut_' + img + '_slice'})
-
-
-def main():
-    pygame.init()
-    pygame.font.init()
-    myfont = pygame.font.SysFont('SimHei', 16)
-
-    size = width, height = 1000, 1000
-    white = 255, 255, 255
-    black = 0, 0, 0
-    rangeChecked = False
-
-    # 创建一个窗口
-    screen = pygame.display.set_mode(size)
-
-    targetCoord = 0
-    gameStarted = False
-    initialMove = False
-    hwnd = 0
-
-    gameState = 'findTarget'
-
-    # 主循环
-    while (not gameStarted):
-        screen.fill(white)
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                sys.exit()
-
-        # 绘制一个矩形
-        pygame.draw.rect(screen, (150, 100, 200), (700, 100, 200, 100))
-        mouse = pygame.mouse.get_pos()
-        # print(mouse)
-        click = pygame.mouse.get_pressed()
-        if (mouse[0] >= 700 and mouse[0] <= 900 and mouse[0] >= 100 and mouse[1] <= 200 and click[0] == 1):
-            # 如果在矩形区域内单击表示游戏启动
-            hwnd = win32gui.FindWindow("GxWindowClass", "魔兽世界")
-            if hwnd == 0:
-                print("魔兽世界没有运行!")
-            else:
-                gameStarted = True
-
-        textImage = myfont.render("程序为研究编写，严禁用于商业目的!", True, black)
-        screen.blit(textImage, (0, 0))
-        pygame.display.flip()
-
-    config.setHwnd(hwnd)
-    # 初始化示意表面
-    win32api.keybd_event(13, 0, 0, 0)
-    win32gui.SetForegroundWindow(hwnd)
-    (left, top, right, bottom) = win32gui.GetWindowRect(hwnd)
-    mapSurface = pygame.Surface((right-left, bottom-top))
-    mapSurface.fill((100, 100, 100))
-    pygame.display.flip()
-    screen.blit(mapSurface, (0, 300))
-    positioner = Positioner(mapSurface)
-
-    is_water = False
-    count_notview = 0
-    is_fighting = False
-    midY = 0
-    time_try_attack = 0
-
-    # tab是比较智能的。优先选取正前方单位
-    pyautogui.press('tab')
-
-    while gameStarted:
-        # 是否在攻击范围内
-        isInRange = False
-        # 是否视野范围内
-        targetSeen = False
-
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                sys.exit()
-
-        win32api.keybd_event(13, 0, 0, 0)
-        try:
-            win32gui.SetForegroundWindow(hwnd)
-        except:
-            continue
-
-        (left, top, right, bottom) = win32gui.GetWindowRect(hwnd)
-
-        # 游戏窗口尺寸
-        window_w = right - left - sc_offset_left - sc_offset_right
-        window_h = bottom - top - sc_offset_top - sc_offset_bottom
-
-        # 游戏区域尺寸
-        game_w = window_w - 2 * frameSize
-        game_h = window_h - titleHeight - 2 * frameSize
-
-        # 游戏区域左上角参考点
-        left_top_x = left + sc_offset_left + frameSize
-        left_top_y = top + sc_offset_top + frameSize + titleHeight
-
-        with mss.mss() as sct:
-            # 头像
-            playerStats = {"top": left_top_y + 15, "left": left_top_x + 21,
-                           "width": 188, "height": 68}
-            targetStats = {"top": left_top_y + 15, "left": left_top_x + 254,
-                           "width": 188, "height": 68}
-            # 去掉头像部分
-            worldView = {"top": left_top_y + 100, "left": left_top_x,
-                         "width": game_w, "height": game_h - 100}
-            miniMapView = {"top": left_top_y, "left": left_top_x + 852,
-                           "width": 170, "height": 175}
-
-            playerStatsSC = sct.grab(playerStats)
-            playerStatsImg = np.array(playerStatsSC)
-            targetStatsSC = sct.grab(targetStats)
-            targetStatsImg = np.array(targetStatsSC)
-            worldViewSC = sct.grab(worldView)
-            worldViewImg = np.array(worldViewSC)
-            miniMapSC1 = sct.grab(miniMapView)
-            miniMapImg1 = np.array(miniMapSC1)
-            miniMapSC2 = sct.grab(miniMapView)
-            miniMapImg2 = np.array(miniMapSC2)
-            if debug:
-                allStats = {"top": top, "left": left,
-                            "width": right - left, "height": bottom - top}
-                allSC = sct.grab(allStats)
-                mss.tools.to_png(allSC.rgb,
-                                 allSC.size, output="wow.png")
-
-                mss.tools.to_png(playerStatsSC.rgb,
-                                 playerStatsSC.size, output="player.png")
-                mss.tools.to_png(targetStatsSC.rgb,
-                                 targetStatsSC.size, output="target.png")
-                mss.tools.to_png(worldViewSC.rgb,
-                                 worldViewSC.size, output="world.png")
-                mss.tools.to_png(miniMapSC1.rgb,
-                                 miniMapSC1.size, output="minimap.png")
-
-            # 得到生命值和魔法值
-            health, mana = getCurrentBar(playerStatsImg)
-            # 目标
-            target = getTargetStats(targetStatsImg)
-
-            playerHealthText = myfont.render(
-                "我的生命值: " + health + "%", False, (0, 0, 0))
-            playerManaText = myfont.render(
-                "我的魔法值: " + mana + "%", False, (0, 0, 0))
-
-            if (target == ""):
-                gameState = 'findTarget'
-                if (target == "enemy" or (kill_neutral and target == "neutral")):
-                    # 得到目标坐标
-                    coord, canSeeTarget, midY = getTargetCoor(worldViewImg)
-                    targetCoord = coord
-                    targetSeen = canSeeTarget
-                else:
-                    targetSeen = False
-            else:
-                is_fighting = False
-
-            if (not is_fighting):
-                # 是否喝水
-                if (mana == '' or int(mana) < 30):
-                    gamestate = 'water'
-                    pyautogui.press('-')
-                    pyautogui.press('=')
-                    is_water = True
-                    time_start_water = datetime.datetime.now()
-                    continue
-                if (is_water):
-                    if (health == 100 and mana == 100):
-                        is_water = False
-                        continue
-                    curr_time = datetime.datetime.now()
-                    durn = (curr_time - time_start_water).seconds
-                    if (durn > 18):
-                        is_water = False
-                    continue
-
-            screen.fill(white)
-
-            if (target == "enemy" or (kill_neutral and target == "neutral")):
-                stopMovement(positioner)
-
-                playerCurrentTarget = myfont.render(
-                    "当前目标: " + target, False, (0, 0, 0))
-                enemyHelth, enemyMana = getTargetBar(targetStatsImg)
-                currTargetStats = myfont.render(
-                    "目标生命: " + enemyHelth, False, (0, 0, 0))
-                screen.blit(currTargetStats, (0, 80))
-                screen.blit(playerCurrentTarget, (0, 40))
-
-                # 尝试攻击
-                if (gamestate == 'findTarget'):
-                    # 能攻击吗
-                    if (not rangeChecked):
-                        isInRange = castRangeCheck(worldViewImg)
-                    # 目标在攻击范围内
-                    if (isInRange):
-                        rangeChecked = True
-                        pyautogui.press('1')
-                        gameState = 'tryAttack'
-                        time_try_attack = int(round(time.time()*1000)
-                        # 1.5s后检查有没有进入战斗状态
-                elif (gamestate == 'tryAttack'):
-                    curr_time=int(round(time.time()*1000)
-                    durn=(curr_time - time_start_water)
-                    if (durn > 1600):
-                        # 进入战斗状态
-                        is_fighting=isFighting(playerStatsImg)
-                        if (is_fighting):
-                            gamestate == 'fighting'
-                        else:
-                            # 没有进入战斗状态
-                            gamestate='findTarget'
-                    continue
-                elif (gamestate == 'fighting')
-                    pyautogui.press('1')
-
-                if (targetSeen and (target == "enemy" or (kill_neutral and target == "neutral"))):
-                    losText=myfont.render("目标在视野中", False, (0, 0, 0))
-                    screen.blit(losText, (0, 60))
-
-                    # 能攻击吗
-                    if (not rangeChecked):
-                        isInRange=castRangeCheck(worldViewImg)
-                    # 目标在攻击范围内
-                    if (isInRange):
-                        rangeChecked=True
-                        pyautogui.press('1')
-                        is_fighting=True
-
-                    else:
-                        pyautogui.keyDown('w')
-                        time.sleep(0.25)
-                        pyautogui.keyUp('w')
-                        positioner.updatePosition()
-                        positioner.drawLinesFromData()
-                    # # 镜头只调整一次
-                    # isCentered = centerScreen(targetCoord, positioner, is_fighting)
-                    # if (isCentered):
-
-                elif (not targetSeen):
-                    is_fighting=False
-                    losText=myfont.render("目标不在视野中", False, (0, 0, 0))
-                    screen.blit(losText, (0, 60))
-                    # 取消目标
-                    pyautogui.press('esc')
-                    pyautogui.press('tab')
-
-            # 没有敌对目标
-            else:
-                is_fighting=False
-                # 按TAB键w
-                if (debug_step):
-                    win32api.keybd_event(13, 0, 0, 0)
-                    win32gui.SetForegroundWindow(hwnd)
-                pyautogui.press('tab')
-                rangeChecked=False
-                releaseControls()
-
-                # 继续检查目标
-                target=getTargetStats(targetStatsImg)
-
-                if (target != "enemy" or (kill_neutral and target != "neutral")):
-                    if (debug_step):
-                        win32api.keybd_event(13, 0, 0, 0)
-                        win32gui.SetForegroundWindow(hwnd)
-                    startMovement(positioner)
-                    # 我们已经在移动了(没有卡住),继续调用移动w
-                    # moving = checkMapMovement(miniMapImg1, miniMapImg2)
-                    moving=positioner.isMoved()
-                    if (moving):
-                        positioner.updatePosition()
-                        positioner.drawLinesFromData()
-                        isLeave=positioner.isMustBack()
-                        if (isLeave):
-                            moveSideWays(positioner)
-                    else:
-                        # 没有移动或者太远了转向
-                        moveSideWays(positioner)
-
-            # print(positioner.direction)
-            screen.blit(playerHealthText, (0, 0))
-            screen.blit(playerManaText, (0, 20))
-            screen.blit(mapSurface, (0, 300))
-            pygame.display.flip()
-
-        screen.fill(white)
-
-
-main()
+# 入口
+if __name__ == '__main__':
+    main()
