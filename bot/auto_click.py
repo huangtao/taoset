@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 #
-# 爬取http://www.howzf.com/esf/xq_index_474467462.htm页面数据
-# huangtao117@yeah.net
+# 自动验证此网站的滑块验证码:http://www.howzf.com/esf/xq_index_474467462.htm
+# 参考文章:
+# 1. https://blog.csdn.net/Jeeson_Z/article/details/82047685
+# 2. https://www.cnblogs.com/ohahastudy/p/11493971.html
+# 3. https://blog.csdn.net/jingjing_94/article/details/80555511
 #
 
 import os
@@ -17,11 +20,6 @@ from selenium.webdriver.support.wait import WebDriverWait
 from urllib.request import urlretrieve
 from bs4 import BeautifulSoup
 from PIL import Image
-
-cut_width = 91
-cut_height = 240
-back_width = 480
-back_height = 240
 
 
 def init():
@@ -76,45 +74,6 @@ def handle_hk():
     #     cv.imshow('res', res)
     #     cv.waitKey(0)
     return res
-
-
-# 得到背景图的边缘
-def get_back_canny(back_img):
-    img_blur = cv.GaussianBlur(back_img, (3, 3), 0)
-    img_gray = cv.cvtColor(img_blur, cv.COLOR_BGR2GRAY)
-    img_canny = cv.Canny(img_gray, 100, 200)
-    return img_canny
-
-
-#
-def get_operator(cut_img):
-    cut_gray = cv.cvtColor(cut_img, cv.COLOR_BGR2GRAY)
-    # 二值化(阀值)
-    _, cut_binary = cv.threshold(cut_gray, 127, 255, cv.THRESH_BINARY)
-    # 获取边界
-    _, contours, hierarchy = cv.findContours(
-        cut_binary, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_NONE)
-    # 获取最外层边界
-    contour = contours[-1]
-    # operator矩阵
-    operator = np.zeros((cut_height, cut_width))
-    # 根据contour填写operator
-    for point in contour:
-        operator[point[0][1]][point[0][0]] = 1
-    return operator
-
-
-def best_match(back_canny, operator):
-    max_value, pos_x = 0, 0
-    for x in range(cut_width, back_width - cut_width):
-        block = back_canny[:,x:x + cut_width]
-
-def get_distance(back_img, cut_img, scaling_ratio):
-    back_canny = get_back_canny(back_img)
-    operator = get_operator(cut_img)
-    pos_x, max_value = best_match(back_canny, operator)
-    distance = pos_x * scaling_ratio
-    return distance
 
 
 # 模式匹配识别
@@ -178,24 +137,15 @@ def do_identify():
             if len(brUrl) == 0 or len(JigsawUrl) == 0:
                 return False
             re = requests.get(brUrl)
-            with open('back.jpg', 'wb') as f:
+            with open('yz_bg.png', 'wb') as f:
                 f.write(re.content)
             re = requests.get(JigsawUrl)
-            with open('cut.jpg', 'wb') as f:
+            with open('yz_hk.png', 'wb') as f:
                 f.write(re.content)
-            back_img = cv.imread('back.jpg')
-            cut_img = cv.imread('cut.jpg')
-            scaling_ratio = browser.find_element_by_class_name(
-                'yidun_bg-img').size['width'] / back_width
-            # 计算要移动的距离
-            x = get_distance(back_img, cut_img, scaling_ratio)
-            distance = x/2 - 27.5
-            print(distance)
-
-            # 将鼠标移动到滑块上
-            el_slider = browser.find_elements_by_class_name('yidun_slider')
-
+            # 滑块和拼图高度是相同的,只要计算出x方向需要移动的距离即可
             move_x, move_y = template_match('a')
+            # 将鼠标移动到滑块上
+            elHk = browser.find_elements_by_class_name('yidun_slider')
             webdriver.ActionChains(browser).move_to_element(elHk[0]).perform()
             webdriver.ActionChains(browser).drag_and_drop_by_offset(
                 elHk[0], move_x, 0).perform()
