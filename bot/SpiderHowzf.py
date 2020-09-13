@@ -20,23 +20,26 @@ import cv2
 import numpy as np
 
 # 验证码有两种类型:
-# a.是出现一个箭头滑块，鼠标到滑动进度条上才出现图片
-# b.直接图片和需要拼的小图片
+# a.是出现一个箭头滑块，鼠标到滑动进度条上才出现图片。
+# b.需要拼的小图片出现在大图片的左上方。大图片一般由若干张小图片组成。图片资源采用base64传给浏览器。
 # 两种类型采用了完全不同的结构
 # 这里因为时间有限只实现a
+
+debug = True
+
+# 这里设定两张图片的尺寸
+cut_width = 60
+cut_height = 160
+back_width = 320
+back_height = 160
 
 
 class Howzf(object):
 
     def __init__(self):
-        self.debug = True
         self.url = ''
         self.back_img = None
         self.cut_img = None
-        self.cut_width = 91
-        self.cut_height = 240
-        self.back_width = 480
-        self.back_height = 240
         self.scaling_ratio = 1.0
         if debug:
             # 打开浏览器
@@ -44,6 +47,25 @@ class Howzf(object):
         else:
             # 打开浏览器(不弹出浏览器页面)
             self.browser = webdriver.PhantomJS()
+
+    def get_page_type(self):
+        # 识别页面情况
+        # 0 - 验证码页面
+        # 1 - 目标数据页面
+        # -1 - 错误
+        try:
+            # 判断是否有<div class='info ip'
+            soup = BeautifulSoup(self.browser.page_source, 'lxml')
+            tag = soup.find_all('div', class_='info ip')
+            if len(tag) > 0:
+                # 是验证页面
+                return 0
+            else:
+                return 1
+        except BaseException as msg:
+            print(msg)
+            return -1
+        return -1
 
     def visit(self, url):
         self.url = url
@@ -59,14 +81,15 @@ class Howzf(object):
                 ctype = self.get_captcha_type()
                 if ctype == 'a':
                     cut_image, back_image = self.get_image()
-                    distance = self.get_distance()
+                    distance = get_distance(back_img=back_image, cut_img=cut_image)
                     self.auto_drag(distance)
                     time.sleep(2)
-                elif ctype == 'b'
+                elif ctype == 'b':
                     # TODO
                     print('尚未实现b类型验证')
+                    self.browser.get(url)
             elif page_type == 1:
-                print(browser.page_source)
+                print(self.browser.page_source)
                 # 演示用，延迟10S后刷新页面
                 time.sleep(10)
                 self.browser.get(url)
@@ -74,25 +97,7 @@ class Howzf(object):
                 # 错误了，刷新
                 self.browser.get(url)
 
-    # 识别页面情况
-    # 0 - 验证码页面
-    # 1 - 目标数据页面
-    # -1 - 错误
-    def get_page_type():
-        try:
-            # 判断是否有<div class='info ip'
-            soup = BeautifulSoup(browser.page_source, 'lxml')
-            tag = soup.find_all('div', class_='info ip')
-            if len(tag) > 0:
-                # 是验证页面
-                return 0
-            else:
-                return 1
-        except BaseException as msg:
-            print(msg)
-            return -1
-
-    def get_captcha_type():
+    def get_captcha_type(self):
         try:
             frame = self.browser.find_element_by_xpath('//iframe')
             # 进入iframe页面
@@ -112,11 +117,10 @@ class Howzf(object):
             print(msg)
             return ''
 
-
     def get_image(self):
-        # 等待加载
-        WebDriverWait(self.browser, 10, 0.5).until(
-            EC.visibility_of_element_located((By.CLASS_NAME, 'yidun_bgimg')))
+        # # 等待加载
+        # WebDriverWait(self.browser, 10, 0.5).until(
+        #     EC.visibility_of_element_located((By.CLASS_NAME, 'yidun_bg-img')))
         back_url = self.browser.find_element_by_class_name(
             "yidun_bg-img").get_attribute('src')
         cut_url = self.browser.find_element_by_class_name(
@@ -130,29 +134,27 @@ class Howzf(object):
         file = BytesIO(resq.content)
         cut_img = Image.open(file)
         cut_img.save("cut_img.png")
+        # 让cut_img高度和back相同，高度不同计算距离会产生错误
+        layer1 = Image.open("cut_img.png")
+        final1 = Image.new("RGBA", (cut_width, cut_height))
+        final1.paste(layer1, (0, 2), layer1)
+        final1.save("cut_final.png")
         # opencv读取图片
         self.back_img = cv2.imread("back_img.jpg")
-        self.cut_img = cv2.imread("cut_img.png")
+        self.cut_img = cv2.imread("cut_final.png")
         self.scaling_ratio = self.browser.find_element_by_class_name(
             "yidun_bg-img").size['width'] / back_width
         return self.cut_img, self.back_img
-
-    def get_distance(self):
-        back_canny = get_back_canny(self.back_img)
-        operator = get_operator(self.cut_img)
-        pos_x, max_value = best_match(back_canny, operator)
-        distance = pos_x * self.scaling_ratio
-        return distance
 
     def auto_drag(self, distance):
         element = self.browser.find_element_by_class_name("yidun_slider")
 
         # 这里就是根据移动进行调试，计算出来的位置不是百分百正确的，加上一点偏移
-        #distance -= element.size.get('width') / 2
+        # distance -= element.size.get('width') / 2
         distance += 13
         has_gone_dist = 0
         remaining_dist = distance
-        #distance += randint(-10, 10)
+        # distance += randint(-10, 10)
 
         # 按下鼠标左键
         ActionChains(self.browser).click_and_hold(element).perform()
@@ -179,6 +181,16 @@ class Howzf(object):
         ActionChains(self.browser).release(on_element=element).perform()
 
 
+def get_distance(back_img, cut_img, slider_width=20):
+    back_canny = get_back_canny(back_img)
+    operator = get_operator(cut_img)
+    pos_x, max_value = best_match(back_canny, operator)
+
+    # 魔术调整
+    pos_x = pos_x - 3
+    return pos_x
+
+
 def read_img_file(cut_dir, back_dir):
     cut_image = cv2.imread(cut_dir)
     back_image = cv2.imread(back_dir)
@@ -200,6 +212,11 @@ def get_back_canny(back_img):
     img_blur = cv2.GaussianBlur(back_img, (3, 3), 0)
     img_gray = cv2.cvtColor(img_blur, cv2.COLOR_BGR2GRAY)
     img_canny = cv2.Canny(img_gray, 100, 200)
+
+    # if debug == True:
+    #     cv2.imshow('Canny', img_canny)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
     return img_canny
 
 
@@ -209,7 +226,7 @@ def get_operator(cut_img):
 
     _, cut_binary = cv2.threshold(cut_gray, 127, 255, cv2.THRESH_BINARY)
     # 获取边界
-    _, contours, hierarchy = cv2.findContours(
+    contours, hierarchy = cv2.findContours(
         cut_binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     # 获取最外层边界
     contour = contours[-1]
@@ -218,13 +235,22 @@ def get_operator(cut_img):
     # 根据 contour填写operator
     for point in contour:
         operator[point[0][1]][point[0][0]] = 1
+
+    # if debug == True
+    #     cv2.imshow('operator', operator)
+    #     cv2.waitKey(0)
+    #     cv2.destroyAllWindows()
     return operator
 
 
 if __name__ == '__main__':
-    page = Howzf()
-    page.visit('http://game.academy.163.com/minigame/2018/showcase/detail/143')
-    cut_image, back_image = page.get_image()
-    distance = page.get_distance()
-    page.auto_drag(distance)
+    # 测试计算距离函数
+    # cut_image, back_image = read_img_file('cut_final.png', 'back_img.jpg')
+    # distance = get_distance(back_img=back_image, cut_img=cut_image)
+    # print(distance)
 
+    page = Howzf()
+    page.visit('http://www.howzf.com/esf/xq_index_474467462.htm')
+    cut_image, back_image = page.get_image()
+    distance = get_distance(back_img=back_image, cut_img=cut_image)
+    page.auto_drag(distance)
