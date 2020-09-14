@@ -25,7 +25,7 @@ import numpy as np
 # 两种类型采用了完全不同的结构
 # 这里因为时间有限只实现a
 
-debug = True
+debug = False
 
 # 这里设定两张图片的尺寸
 cut_width = 60
@@ -46,7 +46,9 @@ class Howzf(object):
             self.browser = webdriver.Chrome()
         else:
             # 打开浏览器(不弹出浏览器页面)
-            self.browser = webdriver.PhantomJS()
+            opt = webdriver.ChromeOptions()
+            opt.set_headless()
+            self.browser = webdriver.Chrome(options=opt)
 
     def get_page_type(self):
         # 识别页面情况
