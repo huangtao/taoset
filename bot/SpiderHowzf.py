@@ -22,10 +22,11 @@ import numpy as np
 # 验证码有两种类型:
 # a.是出现一个箭头滑块，鼠标到滑块或滑动进度条上才出现图片。
 # b.需要拼的小图片出现在大图片的左上方。大图片一般由若干张小图片组成(偶尔也有一张的)。图片资源采用base64传给浏览器。
+# c.a和b的结合体,大图做了放破解水印，下方滑动块为胶囊型
 # 两种类型采用了完全不同的结构
 # 这里因为时间有限只实现a
 
-debug = False
+debug = True
 
 # 这里设定两张图片的尺寸
 cut_width = 60
@@ -64,7 +65,8 @@ class Howzf(object):
             else:
                 return 1
         except BaseException as msg:
-            print(msg)
+            if debug == True:
+                print(msg)
             return -1
         return -1
 
@@ -96,6 +98,10 @@ class Howzf(object):
                     # TODO
                     print('尚未实现b类型验证')
                     self.browser.get(url)
+                elif ctype == 'c':
+                    # TODO
+                    print('尚未实现b类型验证')
+                    self.browser.get(url)
             elif page_type == 1:
                 print(self.browser.page_source)
                 # 演示用，延迟10S后刷新页面
@@ -122,7 +128,8 @@ class Howzf(object):
             print("主人:对方添加了新的验证页面类型，请匹配!")
             return ''
         except BaseException as msg:
-            print(msg)
+            if debug == True:
+                print(msg)
             return ''
 
     def get_image(self):
