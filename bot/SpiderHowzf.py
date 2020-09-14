@@ -20,8 +20,8 @@ import cv2
 import numpy as np
 
 # 验证码有两种类型:
-# a.是出现一个箭头滑块，鼠标到滑动进度条上才出现图片。
-# b.需要拼的小图片出现在大图片的左上方。大图片一般由若干张小图片组成。图片资源采用base64传给浏览器。
+# a.是出现一个箭头滑块，鼠标到滑块或滑动进度条上才出现图片。
+# b.需要拼的小图片出现在大图片的左上方。大图片一般由若干张小图片组成(偶尔也有一张的)。图片资源采用base64传给浏览器。
 # 两种类型采用了完全不同的结构
 # 这里因为时间有限只实现a
 
@@ -40,7 +40,6 @@ class Howzf(object):
         self.url = ''
         self.back_img = None
         self.cut_img = None
-        self.scaling_ratio = 1.0
         if debug:
             # 打开浏览器
             self.browser = webdriver.Chrome()
@@ -86,6 +85,13 @@ class Howzf(object):
                     distance = get_distance(back_img=back_image, cut_img=cut_image)
                     self.auto_drag(distance)
                     time.sleep(2)
+                    # 这里应该已经验证通过了，我们检查一下如果没有通过验证
+                    # 把图片保存起来供分析使用
+                    page_type2 = self.get_page_type()
+                    if page_type2 == 0:
+                        print('主人:滑块验证失败了')
+                        cv2.imwrite('cut_img_failed.png', cut_image)
+                        cv2.imwrite('back_img_failed.jpg', back_image)
                 elif ctype == 'b':
                     # TODO
                     print('尚未实现b类型验证')
@@ -144,8 +150,6 @@ class Howzf(object):
         # opencv读取图片
         self.back_img = cv2.imread("back_img.jpg")
         self.cut_img = cv2.imread("cut_final.png")
-        self.scaling_ratio = self.browser.find_element_by_class_name(
-            "yidun_bg-img").size['width'] / back_width
         return self.cut_img, self.back_img
 
     def auto_drag(self, distance):
